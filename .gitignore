@@ -1,0 +1,13 @@
+# Compiler outputs
+out/
+cache/
+
+# Script logs
+broadcast/
+
+# IDE files
+.vscode/
+.idea/
+
+# Environment variables
+.env
