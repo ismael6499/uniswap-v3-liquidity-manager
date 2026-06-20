@@ -1,4 +1,4 @@
-# AMM V3 Concentrated Liquidity Management
+# Uniswap V3 Liquidity Manager
 
 ![Solidity](https://img.shields.io/badge/Solidity-0.8.26-363636?style=flat-square&logo=solidity)
 ![Foundry](https://img.shields.io/badge/Foundry-Testing-FF9E0F?style=flat-square)
@@ -61,13 +61,15 @@ forge test --fork-url https://ethereum-rpc.publicnode.com -vvv
 ## 📊 Coverage Report
 
 ```text
-╭--------------------------------+------------------+------------------+----------------+----------------╮
-| File                           | % Lines          | % Statements     | % Branches     | % Funcs        |
-+================================+==================+==================+================+================+
-| src/UniswapV3Liquidity.sol     | 100.00% (47/47)  | 100.00% (49/49)  | 100.00% (14/14)| 100.00% (5/5)  |
-| src/utils/ReentrancyGuard.sol  | 100.00% (6/6)    | 100.00% (6/6)    | 100.00% (2/2)  | 100.00% (2/2)  |
-|--------------------------------+------------------+------------------+----------------+----------------|
-| Total                          | 100.00% (53/53)  | 100.00% (55/55)  | 100.00% (16/16)| 100.00% (7/7)  |
-5  |
-╰--------------------------------+------------------+------------------+----------------+----------------╯
+╭----------------------------------------+-----------------+-----------------+-----------------+-----------------╮
+| File                                   | % Lines         | % Statements    | % Branches      | % Funcs         |
++================================================================================================================+
+| src/UniswapV3Liquidity.sol             | 100.00% (57/57) | 100.00% (73/73) | 100.00% (11/11) | 100.00% (5/5)   |
+| src/utils/ReentrancyGuard.sol          | 85.71% (6/7)    | 80.00% (4/5)    | 0.00%* (0/1)    | 100.00% (2/2)   |
+|----------------------------------------+-----------------+-----------------+-----------------+-----------------|
+| Total (Production Contracts)           | 98.44% (63/64)  | 98.72% (77/78)  | 91.67% (11/12)  | 100.00% (7/7)   |
+╰----------------------------------------+-----------------+-----------------+-----------------+-----------------╯
 ```
+
+> [!NOTE]
+> `*` The `ReentrancyGuard` modifier branch reports `0.00%` due to a known limitation in the Solidity compiler's source mappings under `via_ir` mode when mapping modifier branch coverage. The reentrancy check itself is fully tested and verified by `test_RevertWhen_ReentrantCall()`.
