@@ -3,6 +3,7 @@ pragma solidity 0.8.26;
 
 import {Test, console2} from "forge-std/Test.sol";
 import {UniswapV3Liquidity} from "../../src/UniswapV3Liquidity.sol";
+import {ReentrancyGuard} from "../../src/utils/ReentrancyGuard.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {IUniswapV3Factory} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
@@ -262,6 +263,88 @@ contract UniswapV3LiquidityTest is Test {
         vm.stopPrank();
     }
 
+    /// @notice Verify revert when increasing liquidity with zero desired amounts
+    function test_RevertWhen_IncreaseLiquidityZeroAmountDesired() public {
+        vm.startPrank(ALICE);
+        vm.expectRevert(UniswapV3Liquidity.ZeroAmount.selector);
+        liquidityContract.increaseLiquidity(1, USDC, WETH, 0, 1000);
+
+        vm.expectRevert(UniswapV3Liquidity.ZeroAmount.selector);
+        liquidityContract.increaseLiquidity(1, USDC, WETH, 1000, 0);
+        vm.stopPrank();
+    }
+
+    /// @notice Verify revert when decreasing liquidity with zero liquidity
+    function test_RevertWhen_DecreaseLiquidityZeroAmount() public {
+        vm.startPrank(ALICE);
+        vm.expectRevert(UniswapV3Liquidity.ZeroAmount.selector);
+        liquidityContract.decreaseLiquidity(1, 0);
+        vm.stopPrank();
+    }
+
+    /// @notice Verify reentrancy guard successfully blocks recursive calls
+    function test_RevertWhen_ReentrantCall() public {
+        ReentrantToken reentrantToken = new ReentrantToken(address(liquidityContract));
+        vm.startPrank(ALICE);
+        
+        address token0 = address(reentrantToken);
+        address token1 = WETH;
+        if (token0 >= token1) {
+            token0 = WETH;
+            token1 = address(reentrantToken);
+        }
+
+        IERC20(token0).approve(address(liquidityContract), 100);
+        IERC20(token1).approve(address(liquidityContract), 100);
+
+        vm.expectRevert(ReentrancyGuard.ReentrancyGuard__ReentrantCall.selector);
+        liquidityContract.mintPosition(token0, token1, FEE_MEDIUM, -60, 60, 100, 100);
+        vm.stopPrank();
+    }
+
+    /// @notice Verify revert if actual received tokens are zero (simulating failed transfer or zero-tax)
+    function test_RevertWhen_ActualAmountZero() public {
+        ZeroTransferToken zeroToken = new ZeroTransferToken();
+        vm.startPrank(ALICE);
+        
+        address token0 = address(zeroToken);
+        address token1 = WETH;
+        if (token0 >= token1) {
+            token0 = WETH;
+            token1 = address(zeroToken);
+        }
+
+        IERC20(token0).approve(address(liquidityContract), 100);
+        IERC20(token1).approve(address(liquidityContract), 100);
+
+        vm.expectRevert(UniswapV3Liquidity.ZeroAmount.selector);
+        liquidityContract.mintPosition(token0, token1, FEE_MEDIUM, -60, 60, 100, 100);
+        vm.stopPrank();
+    }
+
+    /// @notice Verify revert if actual received tokens are zero on increaseLiquidity
+    function test_RevertWhen_IncreaseLiquidityActualAmountZero() public {
+        (uint256 tokenId, ) = _mintTestPosition();
+        ZeroTransferToken zeroToken = new ZeroTransferToken();
+        vm.startPrank(ALICE);
+        
+        INonfungiblePositionManager(POSITION_MANAGER).approve(address(liquidityContract), tokenId);
+
+        address token0 = address(zeroToken);
+        address token1 = WETH;
+        if (token0 >= token1) {
+            token0 = WETH;
+            token1 = address(zeroToken);
+        }
+
+        IERC20(token0).approve(address(liquidityContract), 100);
+        IERC20(token1).approve(address(liquidityContract), 100);
+
+        vm.expectRevert(UniswapV3Liquidity.ZeroAmount.selector);
+        liquidityContract.increaseLiquidity(tokenId, token0, token1, 100, 100);
+        vm.stopPrank();
+    }
+
     // ═════════════════════════════════════════════════════════════════════
     // HELPERS
     // ═════════════════════════════════════════════════════════════════════
@@ -285,5 +368,40 @@ contract UniswapV3LiquidityTest is Test {
         (tokenId, liquidity,,) =
             liquidityContract.mintPosition(USDC, WETH, FEE_MEDIUM, tickLower, tickUpper, amount0, amount1);
         vm.stopPrank();
+    }
+}
+
+contract ReentrantToken {
+    address private target;
+
+    constructor(address _target) {
+        target = _target;
+    }
+
+    function transferFrom(address, address, uint256) external returns (bool) {
+        UniswapV3Liquidity(target).collectFees(1);
+        return true;
+    }
+
+    function balanceOf(address) external view returns (uint256) {
+        return 1000;
+    }
+
+    function approve(address, uint256) external returns (bool) {
+        return true;
+    }
+}
+
+contract ZeroTransferToken {
+    function transferFrom(address, address, uint256) external returns (bool) {
+        return true;
+    }
+
+    function balanceOf(address) external view returns (uint256) {
+        return 1000;
+    }
+
+    function approve(address, uint256) external returns (bool) {
+        return true;
     }
 }
